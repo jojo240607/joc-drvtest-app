@@ -1,6 +1,12 @@
 //! 驱动用例分组注册表：按依赖顺序排列（地基 → 基础外设 → 总线/引擎）。
 //! 新增驱动用例：写一个 `cases/d_xxx.rs`，在此 `pub mod` + 追加 `Case` 项即可。
 
+pub mod d_can;
+pub mod d_flash;
+pub mod d_i2s;
+pub mod d_sd_card;
+pub mod d_usb;
+pub mod d_wdg;
 pub mod d_adc;
 pub mod d_crc;
 pub mod d_dac;
@@ -59,4 +65,13 @@ pub static CASES: &[Case] = &[
     Case { group: "d_spi_i2c", name: "i2c_scan", budget_ms: 6000, run: d_spi_i2c::i2c_scan },
     Case { group: "d_spi_i2c", name: "spi_cr1", budget_ms: 1000, run: d_spi_i2c::spi_cr1 },
     Case { group: "d_dma", name: "dma_pool", budget_ms: 1000, run: d_dma::dma_pool },
+
+    /* ---- v2：CAN / FLASH / WDG / I2S / SDIO+SD 卡 / USB ---- */
+    Case { group: "d_can", name: "can_loopback", budget_ms: 2000, run: d_can::can_loopback },
+    Case { group: "d_flash", name: "flash_ioctl", budget_ms: 1000, run: d_flash::flash_ioctl },
+    Case { group: "d_wdg", name: "iwdg_config", budget_ms: 1000, run: d_wdg::iwdg_config },
+    Case { group: "d_wdg", name: "wwdg_config", budget_ms: 1000, run: d_wdg::wwdg_config },
+    Case { group: "d_i2s", name: "i2s_config", budget_ms: 1500, run: d_i2s::i2s_config },
+    Case { group: "d_sd_card", name: "sdio_sd_init", budget_ms: 3000, run: d_sd_card::sdio_sd_init },
+    Case { group: "d_usb", name: "usb_ioctl", budget_ms: 3000, run: d_usb::usb_ioctl },
 ];

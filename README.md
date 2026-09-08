@@ -9,7 +9,7 @@
 │  系统分区 (joc-base build_rel/stm32f407_minimal.elf)              │
 │    g_app_slot 函数指针表（app 不直接链接裸 RTOS 符号/不碰裸寄存器） │
 │  应用分区 (本工程 app.bin)                                        │
-│    runner 任务 → 依次跑 21 个用例 → DRVTEST REPORT                 │
+│    runner 任务 → 依次跑 28 个用例 → DRVTEST REPORT                 │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -57,7 +57,9 @@ EOF
 **自动化验收**：`cargo test --release --test x_drvtest`（mcu_simulater 仓库内）。
 断言：App 挂载 + 心跳出现 + `DRVTEST REPORT fail=0`，INSN_INVALID 兜底判失败。
 
-## 用例清单（21 个，15 组驱动）
+## 用例清单（28 个，21 组驱动）
+
+### v1（21 个，15 组）
 
 | 组 | 用例 | 判据 |
 |---|---|---|
@@ -75,6 +77,17 @@ EOF
 | d_dac | dac_ioctl | SET/GET_VALUE 往返一致 |
 | d_spi_i2c | i2c_scan / spi_cr1 | I2C 扫描完成+CCR 回读；SPI 任一总线 open+CR1 回读 |
 | d_dma | dma_pool | 流池管理器 open 成功（深层使用由 timer0 预留流间接覆盖） |
+
+### v2（7 个，6 组，延后清单实施）
+
+| 组 | 用例 | 判据 |
+|---|---|---|
+| d_can | can_loopback | can0（BTR.LBKM 回环）SEND_FRAME 0x123 8 字节 → RECV 逐字段比对一致；TSR.TXOK0 置位；非回环模式则 Skip |
+| d_flash | flash_ioctl | 受管扇区回读 == 11、基址 == 0x080E0000、状态寄存器无 BSY（不擦写） |
+| d_wdg | iwdg_config / wwdg_config | 预分频/重装载/窗口 ioctl SET→GET 往返一致；**绝不 START**（一旦武装无法停止，超时复位系统会丢验收） |
+| d_i2s | i2s_config | I2SCFGR.I2SE 使能 + 音频时钟 48kHz 回读 + 分频非 0 + PLLI2S 就绪 |
+| d_sd_card | sdio_sd_init | sdio0 open 后 CLKCR（CLKDIV=118/CLKEN/PWRCTRL/WIDBUS 4-bit）回读；sd_card0 SD_CARD_IOCTL_INIT 初始化序列跑通（虚拟卡就绪） |
+| d_usb | usb_ioctl | usb0 open + 核心寄存器回读 + 固件 USB 栈自测（RUN_CTRL_SELFTEST，纯软件合成控制传输，不依赖物理主机）== 0 |
 
 ## 判据设计原则
 
@@ -109,7 +122,24 @@ EOF
 - **mcu_simulater**：`tests/x_drvtest.rs` 是 CI 验收；模拟器缺口（如 RTC 的 LSI、
   出厂校准字、DAC 无触发转 DOR）会随工程暴露并修复。
 
-## v2 延后清单
+## v2 实施记录（can/flash/iwdg/wwdg/i2s/sdio/sd_card/usb）
 
-usb（open 慢/模型缺）、sdio/sd_card、flash、can、iwdg/wwdg、i2s、fsmc、dcmi，
-以及 uart DMA TX 写路径在真机上的完整判据。
+v1 批准的延后清单已实施完毕：can、flash、iwdg/wwdg、i2s、sdio/sd_card、usb 全部跑通
+（`DRVTEST REPORT total=28 pass=28 fail=0 skip=0`）。原清单中的 **dcmi/fsmc 未注册
+board 节点**，本期不实施（无设备可验证）。
+
+v2 暴露并修复的模拟器缺口（对齐 F407 真机语义，而非绕过判据）：
+
+| 缺口 | 说明 |
+|---|---|
+| CAN 回环路由死锁 | machine 订阅回调对发送端二次加锁导致重入死锁；改为在 `Can::transmit` 锁内直接 `feed_rx` 完成回环 |
+| CAN DLC 位布局 | 发送邮箱 TDTR / 接收邮箱 RDT0R 的 `DLC[3:0]` 在 **bits 0:3**（bxCAN 权威，svd2rust 佐证），非 bit19:16 |
+| CAN_BTR_LBKM | F407 回环模式位是 **bit30**（SILM=bit31），SDK 常量与模拟器据此对齐 |
+| SDIO 状态寄存器偏移 | F4 布局 **STA@0x34 / ICR@0x38 / MASK@0x3C / FIFOCNT@0x48**（非 0x38/0x3C/0x40/0x44）；偏移错位曾使固件 `r->STA` 落空→命令恒超时 |
+| SDIO ACMD41 OCR | 虚拟卡就绪需置 **bit31（上电完成/busy 结束）**+bit30（CCS），否则 sc_init 轮询超时 |
+| SDIO_CLKCR 位 | F4 布局 CLKDIV[7:0]、**CLKEN=bit8**、WIDBUS[12:11]（用例回读据此断言） |
+| FLASH 寄存器区 | 新增 FLASH 外设模型（KEYR/SR/CR），flash0 的 GET_SECTOR/GET_BASE/GET_STATUS 可回读 |
+| RCC PLLI2S | 新增 PLLI2SON→PLLI2SRDY 立即就绪，i2s0 的 48kHz/PLL 链路可回读 |
+
+固件（joc-base）在 v2 中**未改动**——以上均为模拟器建模错误或 SDK 常量错误，已被
+验证工程暴露并修正（这正是"驱动验证"的价值：验证方与被测方交叉对拍，纠出建模偏差）。
