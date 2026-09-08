@@ -1,0 +1,26 @@
+# joc-drvtest-app workspace：驱动验证应用（消费 joc-rtos-app-sdk）。
+#
+# 本工程是 jOS RTOS 应用分区（轨 B）：以 `joc-rtos-app-sdk` 为 SDK（path 依赖，
+# 单点真源），实现 `app_main()` 后由 build_app.py 打包成 app.bin，烧到 APP_FLASH，
+# 被 joc-base 系统区自举挂载。核心目标：逐个驱动「跑通」验证（open/read/write/
+# ioctl/中断路径），输出 pass/fail/skip 报告。
+#
+# 注意：sdk 不是本 workspace 成员（它是 joc-rtos-app-sdk 仓库的成员），经 path
+# 依赖引入；构建时本 workspace 的 [profile.release] 会作用到它（cargo 剖面以
+# 根 workspace 为准），此处与 SDK 仓库保持一致。
+[workspace]
+resolver = "2"
+members = ["apps/drvtest"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["joc"]
+license = "MIT OR Apache-2.0"
+
+[profile.release]
+opt-level = "z"      # 尺寸优先（APP_FLASH 384KB / APP_RAM 111KB 预算）
+lto = true
+codegen-units = 1
+panic = "abort"      # 无 unwind；panic! -> UDF -> 内核 fault handler
+debug = false

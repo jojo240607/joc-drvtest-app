@@ -1,0 +1,62 @@
+//! 驱动用例分组注册表：按依赖顺序排列（地基 → 基础外设 → 总线/引擎）。
+//! 新增驱动用例：写一个 `cases/d_xxx.rs`，在此 `pub mod` + 追加 `Case` 项即可。
+
+pub mod d_adc;
+pub mod d_crc;
+pub mod d_dac;
+pub mod d_dma;
+pub mod d_exti;
+pub mod d_gpio;
+pub mod d_pwm;
+pub mod d_rtc;
+pub mod d_rng;
+pub mod d_spi_i2c;
+pub mod d_timer;
+pub mod d_uart;
+pub mod k_sdk;
+
+use crate::runner::Case;
+
+/// 全部用例（const 数组；顺序即执行顺序）。
+pub static CASES: &[Case] = &[
+    /* ---- k_sdk：SDK/RTOS 地基 ---- */
+    Case { group: "k_sdk", name: "tick_msleep", budget_ms: 500, run: k_sdk::tick_and_msleep },
+    Case { group: "k_sdk", name: "spawn_sem", budget_ms: 1000, run: k_sdk::spawn_and_sem },
+    Case { group: "k_sdk", name: "mutex_roundtrip", budget_ms: 500, run: k_sdk::mutex_roundtrip },
+    Case { group: "k_sdk", name: "slot_devtable", budget_ms: 500, run: k_sdk::slot_device_table },
+
+    /* ---- d_uart：串口 ---- */
+    Case { group: "d_uart", name: "uart0_console", budget_ms: 1500, run: d_uart::uart0_console },
+    Case { group: "d_uart", name: "uart_others", budget_ms: 1500, run: d_uart::uart_others },
+
+    /* ---- d_gpio：引脚 ---- */
+    Case { group: "d_gpio", name: "output_roundtrip", budget_ms: 1500, run: d_gpio::gpio_output_roundtrip },
+    Case { group: "d_gpio", name: "input_probe", budget_ms: 1000, run: d_gpio::gpio_input_probe },
+
+    /* ---- d_adc：ADC + 温度 ---- */
+    Case { group: "d_adc", name: "adc0_read", budget_ms: 1500, run: d_adc::adc0_read },
+    Case { group: "d_adc", name: "temp0_read", budget_ms: 1500, run: d_adc::temp0_read },
+
+    /* ---- d_rng：随机数 ---- */
+    Case { group: "d_rng", name: "rng_read", budget_ms: 1000, run: d_rng::rng_read },
+
+    /* ---- d_crc：CRC32 引擎（数值正确） ---- */
+    Case { group: "d_crc", name: "crc32_known", budget_ms: 1000, run: d_crc::crc32_known },
+
+    /* ---- d_rtc：实时时钟 ---- */
+    Case { group: "d_rtc", name: "rtc_time", budget_ms: 1500, run: d_rtc::rtc_time },
+
+    /* ---- d_timer / d_exti：定时器 + 中断路径 ---- */
+    Case { group: "d_timer", name: "timer_overflow", budget_ms: 1500, run: d_timer::timer_overflow },
+    Case { group: "d_timer", name: "timer_app_isr", budget_ms: 2000, run: d_timer::timer_app_isr },
+    Case { group: "d_exti", name: "exti_trigger", budget_ms: 1000, run: d_exti::exti_trigger },
+
+    /* ---- d_pwm / d_dac：模拟输出 ---- */
+    Case { group: "d_pwm", name: "pwm_ioctl", budget_ms: 1500, run: d_pwm::pwm_ioctl },
+    Case { group: "d_dac", name: "dac_ioctl", budget_ms: 1000, run: d_dac::dac_ioctl },
+
+    /* ---- d_spi_i2c / d_dma：总线与引擎 ---- */
+    Case { group: "d_spi_i2c", name: "i2c_scan", budget_ms: 6000, run: d_spi_i2c::i2c_scan },
+    Case { group: "d_spi_i2c", name: "spi_cr1", budget_ms: 1000, run: d_spi_i2c::spi_cr1 },
+    Case { group: "d_dma", name: "dma_pool", budget_ms: 1000, run: d_dma::dma_pool },
+];

@@ -1,0 +1,15 @@
+[package]
+name = "drvtest-app"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "jOS 驱动验证应用：经 rtos-app-sdk 逐个验证驱动（uart/gpio/adc/temp/rng/crc/rtc/timer/pwm/dac/spi/i2c/dma）并输出 pass/fail/skip 报告"
+
+[lib]
+# 最终产物 libdrvtest_app.a；由 build_app.py 用 linker/app.ld 链接成 app.bin。
+crate-type = ["staticlib"]
+
+[dependencies]
+# 单点真源：joc-rtos-app-sdk 仓库的 sdk crate（apps/drvtest -> ../../../ = /home/ubuntu/work）
+rtos-app-sdk = { path = "../../../joc-rtos-app-sdk/sdk" }

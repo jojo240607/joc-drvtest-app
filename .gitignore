@@ -1,0 +1,13 @@
+# Rust build output
+target/
+
+# 构建产物（由 build_app.py 生成；需要时再手动提交）
+app.bin
+app.elf
+
+# Python 缓存
+__pycache__/
+
+# 编辑器
+.vscode/
+*.swp
