@@ -9,7 +9,7 @@
 │  系统分区 (joc-base build_rel/stm32f407_minimal.elf)              │
 │    g_app_slot 函数指针表（app 不直接链接裸 RTOS 符号/不碰裸寄存器） │
 │  应用分区 (本工程 app.bin)                                        │
-│    runner 任务 → 依次跑 35 个用例 → DRVTEST REPORT                 │
+│    runner 任务 → 依次跑 36 个用例 → DRVTEST REPORT                 │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -57,14 +57,14 @@ EOF
 **自动化验收**：`cargo test --release --test x_drvtest`（mcu_simulater 仓库内）。
 断言：App 挂载 + 心跳出现 + `DRVTEST REPORT fail=0`，INSN_INVALID 兜底判失败。
 
-## 用例清单（35 个，22 组驱动）
+## 用例清单（36 个，22 组驱动）
 
 ### v1（21 个，15 组）
 
 | 组 | 用例 | 判据 |
 |---|---|---|
 | k_sdk | tick_msleep / spawn_sem / mutex_roundtrip / slot_devtable | RTOS 地基：时间推进、任务/信号量/互斥量、设备服务表 |
-| d_uart | uart0_console / uart_others | 控制台写+波特率 ioctl 往返+非阻塞读；uart1/2/3 open+ioctl |
+| d_uart | uart0_dma_tx_real / uart0_console / uart_others | DMA TX 真机判据（write 返回长度=DMA TC 完成，宿主在虚拟主机捕获模式串字节级比对）；控制台写+波特率 ioctl 往返+非阻塞读；uart1/2/3 open+ioctl |
 | d_gpio | output_roundtrip / input_probe | 输出脚写读往返+toggle；输入脚 open+读 |
 | d_adc | adc0_read | POLL 引擎单次转换，12 位值域合法 |
 | d_temp | temp0_read | 温度 float 在 -40..125°C |
@@ -221,3 +221,11 @@ total 34 → 35（`DRVTEST REPORT total=35 pass=35 fail=0 skip=0`）：
   读落空致命令恒超时）与 TCIF6/TCIF3 位修正（bit17→21、bit23→27）；can_demo
   DLC 宏 `<<16` 错位修正（bxCAN DLC 在 bit0-3，原致模拟器解析 dlc=0）。
   m14_sdio/m15_can 端到端恢复全绿。
+
+**C 类第二项：uart DMA TX 真机判据**——`d_uart.uart0_dma_tx_real`：
+App 经 uart0（控制台，DMA engine）`write` 48 字节模式串（20 字节标记头
+`DRVTEST-DMA-TX-REAL:` + 28 字节递增模式），走 `uart_dma_write`（DMA2_Stream7_CH4
+搬运到 USART1_DR，DMA TC 中断确认），判据“数值正确”= 返回长度一致；
+**宿主字节级判据**：整机验收测试 `tests/x_drvtest.rs` 断言虚拟主机（console）的
+**原始接收缓冲**含完整 48 字节模式串——证明数据**真实从 TX 发出**（到达终端侧），
+而非仅写入数据寄存器。total 35 → 36（`DRVTEST REPORT total=36 pass=36 fail=0 skip=0`）。

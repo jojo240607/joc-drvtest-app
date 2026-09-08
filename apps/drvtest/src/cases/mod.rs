@@ -38,6 +38,7 @@ pub static CASES: &[Case] = &[
     Case { group: "k_sdk", name: "slot_devtable", budget_ms: 500, run: k_sdk::slot_device_table },
 
     /* ---- d_uart：串口 ---- */
+    Case { group: "d_uart", name: "uart0_dma_tx_real", budget_ms: 1500, run: d_uart::uart0_dma_tx_real },
     Case { group: "d_uart", name: "uart0_console", budget_ms: 1500, run: d_uart::uart0_console },
     Case { group: "d_uart", name: "uart_others", budget_ms: 1500, run: d_uart::uart_others },
 
