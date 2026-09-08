@@ -85,5 +85,6 @@ pub static CASES: &[Case] = &[
     Case { group: "d_wdg", name: "wwdg_config", budget_ms: 1000, run: d_wdg::wwdg_config },
     Case { group: "d_i2s", name: "i2s_config", budget_ms: 1500, run: d_i2s::i2s_config },
     Case { group: "d_sd_card", name: "sdio_sd_init", budget_ms: 3000, run: d_sd_card::sdio_sd_init },
+    Case { group: "d_sd_card", name: "block_rw", budget_ms: 3000, run: d_sd_card::block_rw },
     Case { group: "d_usb", name: "usb_ioctl", budget_ms: 3000, run: d_usb::usb_ioctl },
 ];

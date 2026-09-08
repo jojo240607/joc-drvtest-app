@@ -9,7 +9,7 @@
 │  系统分区 (joc-base build_rel/stm32f407_minimal.elf)              │
 │    g_app_slot 函数指针表（app 不直接链接裸 RTOS 符号/不碰裸寄存器） │
 │  应用分区 (本工程 app.bin)                                        │
-│    runner 任务 → 依次跑 34 个用例 → DRVTEST REPORT                 │
+│    runner 任务 → 依次跑 35 个用例 → DRVTEST REPORT                 │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -57,7 +57,7 @@ EOF
 **自动化验收**：`cargo test --release --test x_drvtest`（mcu_simulater 仓库内）。
 断言：App 挂载 + 心跳出现 + `DRVTEST REPORT fail=0`，INSN_INVALID 兜底判失败。
 
-## 用例清单（34 个，22 组驱动）
+## 用例清单（35 个，22 组驱动）
 
 ### v1（21 个，15 组）
 
@@ -88,6 +88,7 @@ EOF
 | d_wdg | iwdg_config / wwdg_config | 预分频/重装载/窗口 ioctl SET→GET 往返一致；**绝不 START**（一旦武装无法停止，超时复位系统会丢验收） |
 | d_i2s | i2s_config | I2SCFGR.I2SE 使能 + 音频时钟 48kHz 回读 + 分频非 0 + PLLI2S 就绪 |
 | d_sd_card | sdio_sd_init | sdio0 open 后 CLKCR（CLKDIV=118/CLKEN/PWRCTRL/WIDBUS 4-bit）回读；sd_card0 SD_CARD_IOCTL_INIT 初始化序列跑通（虚拟卡就绪） |
+| d_sd_card | block_rw | CMD17/CMD24 块面读写：READ_BLOCK 512B == 卡出厂模式数据（0xA5..）、WRITE_BLOCK 0x5A/0x3C 模式字后 READ_BLOCK 回读一致（DMA2_Stream6 搬运 + SDIO 数据相位完成判据） |
 | d_usb | usb_ioctl | usb0 open + 核心寄存器回读 + 固件 USB 栈自测（RUN_CTRL_SELFTEST，纯软件合成控制传输，不依赖物理主机）== 0 |
 
 ## 判据设计原则
@@ -191,3 +192,32 @@ B 类清单中 **fsmc 此前因 board 未注册**不实施；本轮补上完整�
 模拟器 FSMC 模型（Bank1-4 寄存器 + 64KB 窗口后备缓冲 + MBKEN 门控）v1 阶段即已
 存在，本次无需改动。**B 类剩余缺口**：dcmi（board 未注册，无摄像头外设语义）、
 eth（链路层/网络层/应用层全缺，需先建模 PHY/MAC）。
+
+## v5 实施记录（C 类首批：sd_card 块读写）
+
+C 类清单中 **sd_card 块读写（block_rw）** 完成：SD 卡走 ioctl 块面
+（SD_CARD_IOCTL_READ/WRITE_BLOCK，DMA2_Stream6_Ch4 搬运）而非 SDK block vtable，
+total 34 → 35（`DRVTEST REPORT total=35 pass=35 fail=0 skip=0`）：
+
+- **固件（joc-base）**：`drv/sd_card.c` 新增 READ/WRITE_BLOCK ioctl（CMD17/CMD24 +
+  SDIO_IOCTL_CMD_DATA；card_type==2 用 lba 否则 lba*512）；`hal/stm32/sdio_hal.c`
+  修复 DTDIR 方向位（0=写/1=读，原写读颠倒）、`sdio_hal_data_config_dma` 不再自动
+  `|= DMAEN`（DMA 流 EN 后由 `sdio_hal_dma_enable` 单独置位）；`drv/dma.c`
+  **移除 dma_isr 内 log_printf**（jOS 日志系统在中断上下文挂死，为写块悬死根因之一）；
+  `drv/sdio.c` 数据相位改为 DMA start 后再使能 DMAEN；ACMD41 轮询方向修正
+  （等 OCR bit31 busy 清除，真机语义）；失败路径保留 wait_data_end timeout /
+  wait_done rc 诊断日志（成功路径静默）。
+- **SDK（joc-rtos-app-sdk）**：ioctl.rs 镜像 SD_CARD_IOCTL_READ/WRITE_BLOCK（0x61/0x62）
+  与 `SdBlockIo{lba,count,buf}`。
+- **用例 `d_sd_card.block_rw`**：判据“数值正确”——写 0x5A/0x3C 模式字后读回一致、
+  出厂模式 0xA5 回读一致、写后长度/状态码 0。
+- **模拟器（mcu_simulater）**：DMA 位布局按真机修正（`CR_TCIE=1<<4`、LISR/HISR
+  `flag_offset=[0,6,16,22]`、S2/S6 偏移 16 与 joc-base dma_fsr_shift 对齐）；新增
+  `pending_dir`（搬运方向以发布登记为准，joc-base SDIO acquire 恒 M2P 而读发布
+  P2M）；SDIO DMA 读路由改探测式（RM0090 RX 流 S3 优先，S6 fallback 服务两种
+  固件行为）；ACMD41 返回 0x40FF8000（busy 结束，与 m14 固件期望一致）。
+- **测试固件修复（mcu_simulater）**：8 个 DMA demo 的 `DMA_CR_TCIE` 1<<5→1<<4；
+  sdio_demo STATUS/ICR 地址 +4 错位修正（STA@0x34/ICR@0x38，原按 0x38/0x3C
+  读落空致命令恒超时）与 TCIF6/TCIF3 位修正（bit17→21、bit23→27）；can_demo
+  DLC 宏 `<<16` 错位修正（bxCAN DLC 在 bit0-3，原致模拟器解析 dlc=0）。
+  m14_sdio/m15_can 端到端恢复全绿。
