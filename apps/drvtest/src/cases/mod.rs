@@ -11,13 +11,18 @@ pub mod d_adc;
 pub mod d_crc;
 pub mod d_dac;
 pub mod d_dma;
+pub mod d_dma_multi;
 pub mod d_exti;
+pub mod d_exti_multi;
 pub mod d_gpio;
 pub mod d_pwm;
+pub mod d_pwm_multi;
 pub mod d_rtc;
 pub mod d_rng;
+pub mod d_i2c_multi;
 pub mod d_spi_i2c;
 pub mod d_timer;
+pub mod d_timer_multi;
 pub mod d_uart;
 pub mod k_sdk;
 
@@ -55,16 +60,21 @@ pub static CASES: &[Case] = &[
     /* ---- d_timer / d_exti：定时器 + 中断路径 ---- */
     Case { group: "d_timer", name: "timer_overflow", budget_ms: 1500, run: d_timer::timer_overflow },
     Case { group: "d_timer", name: "timer_app_isr", budget_ms: 2000, run: d_timer::timer_app_isr },
+    Case { group: "d_timer", name: "timer_instances", budget_ms: 4000, run: d_timer_multi::timer_instances },
     Case { group: "d_exti", name: "exti_trigger", budget_ms: 1000, run: d_exti::exti_trigger },
+    Case { group: "d_exti", name: "exti_instances", budget_ms: 3000, run: d_exti_multi::exti_instances },
 
     /* ---- d_pwm / d_dac：模拟输出 ---- */
     Case { group: "d_pwm", name: "pwm_ioctl", budget_ms: 1500, run: d_pwm::pwm_ioctl },
+    Case { group: "d_pwm", name: "pwm_instances", budget_ms: 2000, run: d_pwm_multi::pwm_instances },
     Case { group: "d_dac", name: "dac_ioctl", budget_ms: 1000, run: d_dac::dac_ioctl },
 
     /* ---- d_spi_i2c / d_dma：总线与引擎 ---- */
     Case { group: "d_spi_i2c", name: "i2c_scan", budget_ms: 6000, run: d_spi_i2c::i2c_scan },
     Case { group: "d_spi_i2c", name: "spi_cr1", budget_ms: 1000, run: d_spi_i2c::spi_cr1 },
+    Case { group: "d_spi_i2c", name: "i2c_instances", budget_ms: 6000, run: d_i2c_multi::i2c_instances },
     Case { group: "d_dma", name: "dma_pool", budget_ms: 1000, run: d_dma::dma_pool },
+    Case { group: "d_dma", name: "dma2_pool", budget_ms: 500, run: d_dma_multi::dma2_pool },
 
     /* ---- v2：CAN / FLASH / WDG / I2S / SDIO+SD 卡 / USB ---- */
     Case { group: "d_can", name: "can_loopback", budget_ms: 2000, run: d_can::can_loopback },

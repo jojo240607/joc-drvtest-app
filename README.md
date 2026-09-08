@@ -9,7 +9,7 @@
 │  系统分区 (joc-base build_rel/stm32f407_minimal.elf)              │
 │    g_app_slot 函数指针表（app 不直接链接裸 RTOS 符号/不碰裸寄存器） │
 │  应用分区 (本工程 app.bin)                                        │
-│    runner 任务 → 依次跑 28 个用例 → DRVTEST REPORT                 │
+│    runner 任务 → 依次跑 33 个用例 → DRVTEST REPORT                 │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -57,7 +57,7 @@ EOF
 **自动化验收**：`cargo test --release --test x_drvtest`（mcu_simulater 仓库内）。
 断言：App 挂载 + 心跳出现 + `DRVTEST REPORT fail=0`，INSN_INVALID 兜底判失败。
 
-## 用例清单（28 个，21 组驱动）
+## 用例清单（33 个，21 组驱动）
 
 ### v1（21 个，15 组）
 
@@ -143,3 +143,32 @@ v2 暴露并修复的模拟器缺口（对齐 F407 真机语义，而非绕过�
 
 固件（joc-base）在 v2 中**未改动**——以上均为模拟器建模错误或 SDK 常量错误，已被
 验证工程暴露并修正（这正是"驱动验证"的价值：验证方与被测方交叉对拍，纠出建模偏差）。
+
+## v3 实施记录（A 类：实例级缺口补齐）
+
+v1 的 15 组只覆盖了每组**首个实例**（timer0/pwm0/exti0/i2c0/dma1）。本轮补齐各驱动
+**全部实例**的实例级用例，total 28 → 33（`DRVTEST REPORT total=33 pass=33 fail=0 skip=0`）：
+
+| 新用例 | 覆盖 | 判据 |
+|---|---|---|
+| d_timer.timer_instances | timer1-13（TIM1/6/7/8/9/10/11/12/13/14/3/4/5） | 每实例 open → ENABLE 后 20Hz 溢出计数推进 ≥2 → DISABLE；IRQ 共享线（TIM1/TIM10→25、TIM8/TIM13→44）走多 handler 并存 |
+| d_pwm.pwm_instances | pwm1-4（TIM2_CH1_PA15 / TIM1_CH1_PA8 / TIM4_CH1_PD12 / TIM12_CH1_PB14） | 每实例 open → 周期回读>0 → 50% 占空比≈周期一半（±5%）→ 通道开关；pwm4 协调模式周期随 timer7 或 fallback 1kHz，恒>0 |
+| d_exti.exti_instances | exti1(PE6 线6→IRQ23) / exti2(PE1 线1→IRQ7) / btn(PA2→IRQ8) / btn2(PA3→IRQ9) | 每实例 open → App irq_attach_and_enable → TRIGGER → App ISR 收到 + 驱动计数推进；**btn/btn2 的 PA2/PA3 与 uart1(USART2) 引脚共用 → 平台占用跳过** |
+| d_spi_i2c.i2c_instances | i2c1(I2C2@PB10/11) / i2c2(I2C3@PA8/PC9) | open → CCR/CR2_FREQ 回读非 0 → 总线扫描；**i2c2 的 SCL=PA8 与 pwm2(TIM1_CH1) 共用 → 平台占用跳过** |
+| d_dma.dma2_pool | dma2 | 池管理器 open 成功（同 dma1 模式） |
+
+**v3 暴露的模拟器缺口**（对齐真机语义，未绕过判据）：
+
+| 缺口 | 说明 |
+|---|---|
+| APB2 定时器时钟 | 模拟器此前把**所有 TIM 按统一 84MHz 虚拟时钟** tick，TIM1/8/9/10/11（APB2 168MHz）的溢出周期在模拟器上 ×2（如 timer1 20Hz 实际 100ms/拍）。`TimerConfig` 增 `clk_hz`，tick 按 `clk_hz/84MHz` 折算（168MHz 定时器 ×2）后溢出间隔与真机一致 |
+
+**v3 首次修复固件缺陷（joc-base，v1/v2 均未动过固件）**：
+
+| 缺陷 | 说明 |
+|---|---|
+| pwm 协调模式周期误判 | `tim_hal_pwm_period_ticks` 返回 `ARR+1`；协调定时器未 open 时 `ARR=0` → 返回 1（非 0）→ pwm4 open 的 `existing==0` 判断失效，`period_ticks=1`。改为 **ARR==0 返回 0**，正确走 1kHz fallback |
+| I2C2/I2C3 AF 信号名缺失 | board 用 `"I2C2_SCL_PB10"` 等带引脚后缀信号名，AF 表只有 `"I2C2_SCL"`（无后缀，I2C1 却有后缀）→ `pinmux_hal_resolve` 精确匹配失败 → i2c1/i2c2 open **恒败**（真机同样失败）。AF 表补上带后缀条目（I2C2_SCL_PB10/SDA_PB11、I2C3_SCL_PA8/SDA_PC9） |
+
+以上三处（模拟器定时器时钟、固件 pwm 协调周期、固件 AF 信号名）均由 A 类实例级用例
+"每个实例逐个跑通"暴露——这正是补齐实例级覆盖的价值：把只测首个实例时藏住的真缺陷揪出来。
