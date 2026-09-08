@@ -9,7 +9,7 @@
 │  系统分区 (joc-base build_rel/stm32f407_minimal.elf)              │
 │    g_app_slot 函数指针表（app 不直接链接裸 RTOS 符号/不碰裸寄存器） │
 │  应用分区 (本工程 app.bin)                                        │
-│    runner 任务 → 依次跑 33 个用例 → DRVTEST REPORT                 │
+│    runner 任务 → 依次跑 34 个用例 → DRVTEST REPORT                 │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -57,7 +57,7 @@ EOF
 **自动化验收**：`cargo test --release --test x_drvtest`（mcu_simulater 仓库内）。
 断言：App 挂载 + 心跳出现 + `DRVTEST REPORT fail=0`，INSN_INVALID 兜底判失败。
 
-## 用例清单（33 个，21 组驱动）
+## 用例清单（34 个，22 组驱动）
 
 ### v1（21 个，15 组）
 
@@ -84,6 +84,7 @@ EOF
 |---|---|---|
 | d_can | can_loopback | can0（BTR.LBKM 回环）SEND_FRAME 0x123 8 字节 → RECV 逐字段比对一致；TSR.TXOK0 置位；非回环模式则 Skip |
 | d_flash | flash_ioctl | 受管扇区回读 == 11、基址 == 0x080E0000、状态寄存器无 BSY（不擦写） |
+| d_fsmc | fsmc_ioctl | **B 类首批**：BCR1/BTR1 写读往返一致 + BWTR1 复位 0 + 片选未使能窗口访问被拒（hal 门控）+ BANK1_ENABLE 后 MBKEN 置位 + Bank1 窗口（0x60000000）32 位字写读往返一致 |
 | d_wdg | iwdg_config / wwdg_config | 预分频/重装载/窗口 ioctl SET→GET 往返一致；**绝不 START**（一旦武装无法停止，超时复位系统会丢验收） |
 | d_i2s | i2s_config | I2SCFGR.I2SE 使能 + 音频时钟 48kHz 回读 + 分频非 0 + PLLI2S 就绪 |
 | d_sd_card | sdio_sd_init | sdio0 open 后 CLKCR（CLKDIV=118/CLKEN/PWRCTRL/WIDBUS 4-bit）回读；sd_card0 SD_CARD_IOCTL_INIT 初始化序列跑通（虚拟卡就绪） |
@@ -172,3 +173,21 @@ v1 的 15 组只覆盖了每组**首个实例**（timer0/pwm0/exti0/i2c0/dma1）
 
 以上三处（模拟器定时器时钟、固件 pwm 协调周期、固件 AF 信号名）均由 A 类实例级用例
 "每个实例逐个跑通"暴露——这正是补齐实例级覆盖的价值：把只测首个实例时藏住的真缺陷揪出来。
+
+## v4 实施记录（B 类首批：FSMC）
+
+B 类清单中 **fsmc 此前因 board 未注册**不实施；本轮补上完整链路（驱动 + board
+节点 + SDK 常量 + 用例），total 33 → 34（`DRVTEST REPORT total=34 pass=34 fail=0 skip=0`）：
+
+- **固件（joc-base）新增 FSMC 驱动**：`hal/stm32/fsmc_hal.c`（FSMC_Bank1/Bank1E 寄存器
+  面 + RCC AHB3ENR.FSMCEN 时钟 + Bank1 片选窗口 32 位读写 + MBKEN 门控）、
+  `drv/fsmc.c`（设备面：SET/GET BCR1/BTR1、GET BWTR1、BANK1_ENABLE；read/write
+  直通 Bank1 窗口，**片选未使能时返回 -2 防误写**）、`DEVICE_TYPE_FSMC`、board 注册
+  `fsmc0`、CMake 挂源；
+- **SDK（joc-rtos-app-sdk）**：ioctl.rs 镜像 FSMC_IOCTL_*（0x80 段）与 BCR 位常量；
+- **用例 `d_fsmc.fsmc_ioctl`**：数值正确判据（BCR/BTR 往返一致、BWTR 复位 0、
+  未使能窗口访问被拒、ENABLE 后 MBKEN 置位、窗口 32 位字写读往返一致）。
+
+模拟器 FSMC 模型（Bank1-4 寄存器 + 64KB 窗口后备缓冲 + MBKEN 门控）v1 阶段即已
+存在，本次无需改动。**B 类剩余缺口**：dcmi（board 未注册，无摄像头外设语义）、
+eth（链路层/网络层/应用层全缺，需先建模 PHY/MAC）。

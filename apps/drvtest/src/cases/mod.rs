@@ -3,6 +3,7 @@
 
 pub mod d_can;
 pub mod d_flash;
+pub mod d_fsmc;
 pub mod d_i2s;
 pub mod d_sd_card;
 pub mod d_usb;
@@ -79,6 +80,7 @@ pub static CASES: &[Case] = &[
     /* ---- v2：CAN / FLASH / WDG / I2S / SDIO+SD 卡 / USB ---- */
     Case { group: "d_can", name: "can_loopback", budget_ms: 2000, run: d_can::can_loopback },
     Case { group: "d_flash", name: "flash_ioctl", budget_ms: 1000, run: d_flash::flash_ioctl },
+    Case { group: "d_fsmc", name: "fsmc_ioctl", budget_ms: 1500, run: d_fsmc::fsmc_ioctl },
     Case { group: "d_wdg", name: "iwdg_config", budget_ms: 1000, run: d_wdg::iwdg_config },
     Case { group: "d_wdg", name: "wwdg_config", budget_ms: 1000, run: d_wdg::wwdg_config },
     Case { group: "d_i2s", name: "i2s_config", budget_ms: 1500, run: d_i2s::i2s_config },
