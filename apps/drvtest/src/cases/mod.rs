@@ -22,6 +22,7 @@ pub mod d_rtc;
 pub mod d_rng;
 pub mod d_i2c_multi;
 pub mod d_spi_i2c;
+pub mod d_bmi088;
 pub mod d_timer;
 pub mod d_timer_multi;
 pub mod d_uart;
@@ -74,6 +75,11 @@ pub static CASES: &[Case] = &[
     /* ---- d_spi_i2c / d_dma：总线与引擎 ---- */
     Case { group: "d_spi_i2c", name: "i2c_scan", budget_ms: 6000, run: d_spi_i2c::i2c_scan },
     Case { group: "d_spi_i2c", name: "spi_cr1", budget_ms: 1000, run: d_spi_i2c::spi_cr1 },
+    /* ---- d_bmi088：SPI 双片选 IMU 全链路（模拟器虚拟从机回送真实数据） ---- */
+    Case { group: "d_bmi088", name: "who_am_i", budget_ms: 2000, run: d_bmi088::who_am_i },
+    Case { group: "d_bmi088", name: "raw_readout", budget_ms: 2000, run: d_bmi088::raw_readout },
+    Case { group: "d_bmi088", name: "si_readout", budget_ms: 2000, run: d_bmi088::si_readout },
+    Case { group: "d_bmi088", name: "raw_read_12b", budget_ms: 2000, run: d_bmi088::raw_read_12b },
     Case { group: "d_spi_i2c", name: "i2c_instances", budget_ms: 6000, run: d_i2c_multi::i2c_instances },
     Case { group: "d_dma", name: "dma_pool", budget_ms: 1000, run: d_dma::dma_pool },
     Case { group: "d_dma", name: "dma2_pool", budget_ms: 500, run: d_dma_multi::dma2_pool },
