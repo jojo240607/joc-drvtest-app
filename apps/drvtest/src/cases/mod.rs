@@ -22,6 +22,7 @@ pub mod d_rtc;
 pub mod d_rng;
 pub mod d_i2c_multi;
 pub mod d_spi_i2c;
+pub mod d_spi_flash;
 pub mod d_bmi088;
 pub mod d_timer;
 pub mod d_timer_multi;
@@ -77,6 +78,12 @@ pub static CASES: &[Case] = &[
     Case { group: "d_spi_i2c", name: "spi_cr1", budget_ms: 1000, run: d_spi_i2c::spi_cr1 },
     /* ---- d_bmi088：SPI 双片选 IMU 全链路（模拟器虚拟从机回送真实数据） ---- */
     Case { group: "d_bmi088", name: "who_am_i", budget_ms: 2000, run: d_bmi088::who_am_i },
+    /* ---- v3：SPI NOR Flash（保存/存储） ---- */
+    Case { group: "d_spi_flash", name: "jedec_id", budget_ms: 1000, run: d_spi_flash::jedec_id },
+    Case { group: "d_spi_flash", name: "write_read_back", budget_ms: 1500, run: d_spi_flash::write_read_back },
+    Case { group: "d_spi_flash", name: "erase_sector", budget_ms: 1500, run: d_spi_flash::erase_sector },
+    Case { group: "d_spi_flash", name: "persist_marker", budget_ms: 1000, run: d_spi_flash::persist_marker },
+
     Case { group: "d_bmi088", name: "raw_readout", budget_ms: 2000, run: d_bmi088::raw_readout },
     Case { group: "d_bmi088", name: "si_readout", budget_ms: 2000, run: d_bmi088::si_readout },
     Case { group: "d_bmi088", name: "raw_read_12b", budget_ms: 2000, run: d_bmi088::raw_read_12b },
