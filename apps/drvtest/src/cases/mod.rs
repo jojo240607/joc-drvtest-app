@@ -88,4 +88,5 @@ pub static CASES: &[Case] = &[
     Case { group: "d_sd_card", name: "sdio_sd_init", budget_ms: 3000, run: d_sd_card::sdio_sd_init },
     Case { group: "d_sd_card", name: "block_rw", budget_ms: 3000, run: d_sd_card::block_rw },
     Case { group: "d_usb", name: "usb_ioctl", budget_ms: 3000, run: d_usb::usb_ioctl },
+    Case { group: "d_usb", name: "usb_host_comms", budget_ms: 6000, run: d_usb::usb_host_comms },
 ];

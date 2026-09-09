@@ -9,7 +9,7 @@
 │  系统分区 (joc-base build_rel/stm32f407_minimal.elf)              │
 │    g_app_slot 函数指针表（app 不直接链接裸 RTOS 符号/不碰裸寄存器） │
 │  应用分区 (本工程 app.bin)                                        │
-│    runner 任务 → 依次跑 36 个用例 → DRVTEST REPORT                 │
+│    runner 任务 → 依次跑 37 个用例 → DRVTEST REPORT                 │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -57,7 +57,7 @@ EOF
 **自动化验收**：`cargo test --release --test x_drvtest`（mcu_simulater 仓库内）。
 断言：App 挂载 + 心跳出现 + `DRVTEST REPORT fail=0`，INSN_INVALID 兜底判失败。
 
-## 用例清单（36 个，22 组驱动）
+## 用例清单（37 个，22 组驱动）
 
 ### v1（21 个，15 组）
 
@@ -90,6 +90,7 @@ EOF
 | d_sd_card | sdio_sd_init | sdio0 open 后 CLKCR（CLKDIV=118/CLKEN/PWRCTRL/WIDBUS 4-bit）回读；sd_card0 SD_CARD_IOCTL_INIT 初始化序列跑通（虚拟卡就绪） |
 | d_sd_card | block_rw | CMD17/CMD24 块面读写：READ_BLOCK 512B == 卡出厂模式数据（0xA5..）、WRITE_BLOCK 0x5A/0x3C 模式字后 READ_BLOCK 回读一致（DMA2_Stream6 搬运 + SDIO 数据相位完成判据） |
 | d_usb | usb_ioctl | usb0 open + 核心寄存器回读 + 固件 USB 栈自测（RUN_CTRL_SELFTEST，纯软件合成控制传输，不依赖物理主机）== 0 |
+| d_usb | usb_host_comms | 真实主机通信：虚拟主机（模拟器注入）复位→标准枚举（GET_DESCRIPTOR×2/SET_ADDRESS/SET_CONFIGURATION）→ OUT EP1 注入 64B 模式数据（0x55+i），App 读回逐字节一致 |
 
 ## 判据设计原则
 
@@ -229,3 +230,34 @@ App 经 uart0（控制台，DMA engine）`write` 48 字节模式串（20 字节�
 **宿主字节级判据**：整机验收测试 `tests/x_drvtest.rs` 断言虚拟主机（console）的
 **原始接收缓冲**含完整 48 字节模式串——证明数据**真实从 TX 发出**（到达终端侧），
 而非仅写入数据寄存器。total 35 → 36（`DRVTEST REPORT total=36 pass=36 fail=0 skip=0`）。
+
+## v7 实施记录（C 类第三项：usb 真实主机通信）
+
+**C 类第三项：usb 真实主机通信**——`d_usb.usb_host_comms`：
+虚拟主机（模拟器 host 注入）经 **分步握手**完成真实枚举与数据收发，App 侧
+`dev.ioctl(USB_IOCTL_CONNECTED)` 感知连接后读回主机 OUT 数据。total 36 → 37
+（`DRVTEST REPORT total=37 pass=37 fail=0 skip=0`）：
+
+- **握手协议（cfg-run 两阶段）**：App 报 `DRVTEST-USB-HOST-READY` → 宿主注入总线复位；
+  固件 `DCD_HandleUsbReset_ISR` 完成后（DAINTMSK 已配置）逐个注入标准枚举
+  （GET_DESCRIPTOR Device/Config、SET_ADDRESS 0x2A、SET_CONFIGURATION）；App 感知
+  连接后报 `DRVTEST-USB-ENUM-OK` → 宿主经 OUT EP1 注入 64B 模式数据（0x55+i），
+  App `read` 收全 64B 逐字节校验一致。
+- **模拟器 usb_otg 真机语义修正**（枚举走通的关键修复）：
+  - **GINTSTS 位域对齐 ST 设备库**（usb_regs.h `USB_OTG_GINTSTS_TypeDef` 含
+    curmode@0/modemismatch@1/otgintr@2）：rxstsqlvl@4/usbreset@12/enumdone@13/
+    **inepint@18/outepintr@19**（原 OEPINT/IEPINT 用 18/19 反了，导致固件
+    outepintr 分支永不触发、SetupStage 不执行）；
+  - **GRXSTSP pktsts 编码对齐 ST 栈宏**（usb_defines.h：STS_DATA_UPDT=2 /
+    STS_SETUP_COMP=4 / STS_SETUP_UPDT=6，原用 3/2/4 全错位，setup_packet 从未
+    写入，SET_ADDRESS 不生效）；
+  - **TXFE 电平重触发**：DIEPEMPMSK 写与 DIEPINT0 写清后无条件投递 IRQ67，固件清
+    DIEPINT0（如 enumdone 初始化清 0xFF）后 TXFE 仍保持（真机 FIFO 空即电平），
+    slave 回发等 TXFE 不饿死；
+  - **OUT 两阶段注入**：inject_out 只触发 RXFLVL，固件 `DCD_HandleRxStatusQueueLevel_ISR`
+    先读 DFIFO0（xfer_count 累加）后，GRXSTSP 弹 OUT_DATA 状态字再置 DOEPINT1.XFRC +
+    OEPINT——避免 outepintr 分支先于 rxstsqlvl 执行时 cdc_DataOut 看到 xfer_count=0
+    推空（真机数据先入 FIFO 后 XFRC）。
+- **判据**：App 侧 64B 逐字节 `0x55+i` 数值一致；宿主侧 cfg-run 验证注入链
+  （READY→reset→4×SETUP→ENUM-OK→OUT）完整走通。
+- **SDK（joc-rtos-app-sdk）**：ioctl.rs 已提供 `USB_IOCTL_CONNECTED`（0xD4）等常量。
