@@ -26,6 +26,10 @@ pub mod d_spi_flash;
 pub mod d_esc;
 pub mod d_pmw3901;
 pub mod d_vl53l1x;
+pub mod d_can_node;
+pub mod d_st7789;
+pub mod d_eeprom;
+pub mod d_sht30;
 pub mod d_bmi088;
 pub mod d_timer;
 pub mod d_timer_multi;
@@ -115,4 +119,11 @@ pub static CASES: &[Case] = &[
     Case { group: "d_pmw3901", name: "motion_delta", budget_ms: 1500, run: d_pmw3901::motion_delta },
     Case { group: "d_vl53l1x", name: "who_am_i", budget_ms: 1000, run: d_vl53l1x::who_am_i },
     Case { group: "d_vl53l1x", name: "range_mm", budget_ms: 1500, run: d_vl53l1x::range_mm },
+
+    /* ---- d_can_node / d_st7789 / d_eeprom / d_sht30：CAN 节点 + LCD + 存储 + 环境 ---- */
+    Case { group: "d_can_node", name: "motor_ctrl_response", budget_ms: 2000, run: d_can_node::motor_ctrl_response },
+    Case { group: "d_st7789", name: "init_and_id", budget_ms: 1500, run: d_st7789::init_and_id },
+    Case { group: "d_st7789", name: "fill_window", budget_ms: 2000, run: d_st7789::fill_window },
+    Case { group: "d_eeprom", name: "write_read_roundtrip", budget_ms: 1500, run: d_eeprom::write_read_roundtrip },
+    Case { group: "d_sht30", name: "temp_humi", budget_ms: 1500, run: d_sht30::temp_humi },
 ];

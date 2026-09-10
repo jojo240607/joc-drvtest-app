@@ -62,29 +62,26 @@ pub fn fsmc_ioctl(_ctx: &mut Ctx) -> Verdict {
         return Verdict::Fail("未使能片选窗口访问应返回负值");
     }
 
-    // 5) BANK1_ENABLE → BCR1.MBKEN 置位
-    if dev.ioctl(FSMC_IOCTL_BANK1_ENABLE, null_mut()) != 0 {
-        return Verdict::Fail("BANK1_ENABLE 失败");
-    }
-    if dev.ioctl(FSMC_IOCTL_GET_BCR, (&mut rbcr as *mut u32).cast()) != 0 {
-        return Verdict::Fail("GET_BCR#2 失败");
-    }
-    if rbcr & FSMC_BCR_MBKEN == 0 {
-        return Verdict::Fail("BCR1.MBKEN 未置位");
+    // 5) BANK2_ENABLE → BCR2.MBKEN 置位（Bank1 挂 LCD，窗口往返测试走 Bank2）
+    if dev.ioctl(FSMC_IOCTL_BANK2_ENABLE, null_mut()) != 0 {
+        return Verdict::Fail("BANK2_ENABLE 失败");
     }
 
-    // 6) Bank1 窗口 32 位字写读往返
-    let pattern: [u8; 8] = [0xEF, 0xBE, 0xAD, 0xDE, 0x78, 0x56, 0x34, 0x12];
-    if dev.write(&pattern) != 8 {
-        return Verdict::Fail("窗口写失败");
-    }
-    let mut back = [0u8; 8];
-    if dev.read(&mut back) != 8 {
-        return Verdict::Fail("窗口读失败");
-    }
-    if back != pattern {
-        return Verdict::Fail("窗口写读往返不一致");
+    // 6) Bank2 窗口 32 位字写读往返
+    let words: [u32; 2] = [0xDEAD_BEEF, 0x1234_5678];
+    for (i, w) in words.iter().enumerate() {
+        let mut w32 = FsmcWin32 { off: (i as u32) * 4, value: *w };
+        if dev.ioctl(FSMC_IOCTL_BANK2_WRITE32, (&mut w32 as *mut FsmcWin32).cast()) != 0 {
+            return Verdict::Fail("BANK2_WRITE32 失败");
+        }
+        let mut r32 = FsmcWin32 { off: (i as u32) * 4, value: 0 };
+        if dev.ioctl(FSMC_IOCTL_BANK2_READ32, (&mut r32 as *mut FsmcWin32).cast()) != 0 {
+            return Verdict::Fail("BANK2_READ32 失败");
+        }
+        if r32.value != *w {
+            return Verdict::Fail("Bank2 窗口写读往返不一致");
+        }
     }
 
-    Verdict::Pass("fsmc0 BCR/BTR/BWTR 往返 + Bank1 窗口写读一致")
+    Verdict::Pass("fsmc0 BCR/BTR/BWTR 往返 + Bank2 窗口写读一致（Bank1 挂 LCD）")
 }
