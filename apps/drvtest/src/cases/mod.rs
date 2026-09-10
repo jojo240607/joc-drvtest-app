@@ -24,6 +24,8 @@ pub mod d_i2c_multi;
 pub mod d_spi_i2c;
 pub mod d_spi_flash;
 pub mod d_esc;
+pub mod d_pmw3901;
+pub mod d_vl53l1x;
 pub mod d_bmi088;
 pub mod d_timer;
 pub mod d_timer_multi;
@@ -107,4 +109,10 @@ pub static CASES: &[Case] = &[
     /* ---- d_esc：ESC 电调 + 无刷电机虚拟外设（PWM + DShot 双输入） ---- */
     Case { group: "d_esc", name: "pwm_throttle", budget_ms: 2000, run: d_esc::pwm_throttle },
     Case { group: "d_esc", name: "dshot_throttle", budget_ms: 2000, run: d_esc::dshot_throttle },
+
+    /* ---- d_pmw3901 / d_vl53l1x：光流 + 激光测距（飞控观测环） ---- */
+    Case { group: "d_pmw3901", name: "product_id", budget_ms: 1000, run: d_pmw3901::product_id },
+    Case { group: "d_pmw3901", name: "motion_delta", budget_ms: 1500, run: d_pmw3901::motion_delta },
+    Case { group: "d_vl53l1x", name: "who_am_i", budget_ms: 1000, run: d_vl53l1x::who_am_i },
+    Case { group: "d_vl53l1x", name: "range_mm", budget_ms: 1500, run: d_vl53l1x::range_mm },
 ];

@@ -7,7 +7,6 @@
 //! 模拟器 ESC 虚拟外设（vperiph/esc.rs）订阅 TimPwm/GpioLevel 事件解码，
 //! 宿主测试 x_drvtest 校验解码出的电调量/转速数值（本用例只负责产生信号）。
 
-use rtos_app_sdk::device::Device;
 use rtos_app_sdk::info;
 use rtos_app_sdk::ioctl::{
     DSHOT_IOCTL_SEND, PWM_IOCTL_ENABLE_CHANNEL, PWM_IOCTL_SET_DUTY_PERCENT,
