@@ -23,6 +23,7 @@ pub mod d_rng;
 pub mod d_i2c_multi;
 pub mod d_spi_i2c;
 pub mod d_spi_flash;
+pub mod d_esc;
 pub mod d_bmi088;
 pub mod d_timer;
 pub mod d_timer_multi;
@@ -102,4 +103,8 @@ pub static CASES: &[Case] = &[
     Case { group: "d_sd_card", name: "block_rw", budget_ms: 3000, run: d_sd_card::block_rw },
     Case { group: "d_usb", name: "usb_ioctl", budget_ms: 3000, run: d_usb::usb_ioctl },
     Case { group: "d_usb", name: "usb_host_comms", budget_ms: 6000, run: d_usb::usb_host_comms },
+
+    /* ---- d_esc：ESC 电调 + 无刷电机虚拟外设（PWM + DShot 双输入） ---- */
+    Case { group: "d_esc", name: "pwm_throttle", budget_ms: 2000, run: d_esc::pwm_throttle },
+    Case { group: "d_esc", name: "dshot_throttle", budget_ms: 2000, run: d_esc::dshot_throttle },
 ];
