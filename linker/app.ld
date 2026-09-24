@@ -32,7 +32,7 @@ SECTIONS
   .app_header :
   {
     LONG(0x41504800)                    /* magic: "APH\0" */
-    LONG(1)                             /* abi_version: MUST == RTOS_ABI_VERSION (joc-base) */
+    LONG(2)                             /* abi_version: MUST == RTOS_ABI_VERSION (joc-base)；v2=rtos_sleep_until_abs（09-19 c0c9697），2026-09-24 同步 */
     LONG(ABSOLUTE(rust_app_start))      /* entry: App 入口绝对地址 */
     LONG(0)                             /* app_size: 占位（系统侧仅作日志，不强制校验） */
     LONG(0)                             /* reserved */
